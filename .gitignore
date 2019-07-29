@@ -1,0 +1,7 @@
+.pio
+.pioenvs
+.piolibdeps
+.DS_Store
+.idea
+cmake-build-debug
+CMake*

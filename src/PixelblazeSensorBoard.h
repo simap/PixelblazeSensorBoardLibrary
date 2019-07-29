@@ -1,12 +1,16 @@
+//
+// Created by Ben Hencke on 2019-07-28.
+//
 
-#include "Arduino.h"
-#include <SoftwareSerial.h>
+#ifndef SB_ARDUINO_PIXELBLAZESENSORBOARD_H
+#define SB_ARDUINO_PIXELBLAZESENSORBOARD_H
+
+#include <Arduino.h>
 
 
-
-static const int RXPin = 4, TXPin = 3;
-SoftwareSerial ss(RXPin, TXPin);
-
+#ifndef ICACHE_RAM_ATTR
+#define ICACHE_RAM_ATTR
+#endif
 
 typedef struct {
 //    char header[6]; // "SB1.0\0"
@@ -28,6 +32,7 @@ public:
     uint8_t pos = 0;
     SB10Frame sb10Frame;
     uint8_t frameBuffer[sizeof(SB10Frame)];
+    unsigned long lastFrameTime = 0;
 
     PixelblazeSensorBoard(Stream &source) : source(source) {
     }
@@ -47,10 +52,10 @@ public:
         return sb10Frame.maxFrequency;
     }
     int16_t accelerometerX() {
-        return sb10Frame.accelerometer[0];
+        return sb10Frame.accelerometer[1];
     }
     int16_t accelerometerY() {
-        return sb10Frame.accelerometer[1];
+        return sb10Frame.accelerometer[0];
     }
     int16_t accelerometerZ() {
         return sb10Frame.accelerometer[2];
@@ -63,11 +68,14 @@ public:
             return 0;
         return sb10Frame.analogInputs[index];
     }
+    unsigned long dataAgeMillis() {
+        return millis() - lastFrameTime;
+    }
 
     bool readNextFrame() {
         if (source.available() < 1)
             return false;
-        unsigned long timeout = source.getTimeout();
+        unsigned long timeout = 15;
         unsigned long startMs = millis();
         do {
             int c = source.read();
@@ -82,7 +90,14 @@ public:
         return false;
     }
 
-    inline bool processFrameByte(uint8_t c) {
+    void ICACHE_RAM_ATTR readAvailable() {
+        int c;
+        while ((c = source.read()) >= 0) {
+            processFrameByte(c);
+        }
+    }
+
+    bool ICACHE_RAM_ATTR processFrameByte(uint8_t c) {
         bool result = false;
         switch (mode) {
             case HEADER:
@@ -110,47 +125,12 @@ public:
                     mode = HEADER;
                     pos = 0;
                     memcpy(&sb10Frame, frameBuffer, sizeof(SB10Frame));
+                    lastFrameTime = millis();
                     result = true;
                 }
         }
         return result;
     }
 };
-//PixelblazeSensorBoard sb(Serial);
-PixelblazeSensorBoard sb(ss);
 
-void setup() {
-    ss.setTimeout(15);
-    ss.begin(115200);
-    Serial.begin(115200);
-}
-
-void loop() {
-    unsigned long start = millis();
-    if (sb.readNextFrame()) {
-        unsigned long end = millis();
-        Serial.print("Got frame in ");
-        Serial.print(end - start);
-//        Serial.print(" energyAverage:");
-//        Serial.print(sb.energyAverage());
-//
-//        Serial.print(" light:");
-//        Serial.print(sb.light());
-//
-//        Serial.print(" accelerometerX:");
-//        Serial.print(sb.accelerometerX());
-
-//        Serial.print(" accelerometerY:");
-//        Serial.print(sb.accelerometerY());
-//
-//        Serial.print(" accelerometerZ:");
-//        Serial.print(sb.accelerometerZ());
-//
-//        Serial.print(" maxFrequencyMagnitude:");
-//        Serial.print(sb.maxFrequencyMagnitude());
-//
-//        Serial.print(" maxFrequency:");
-//        Serial.print(sb.sb10Frame.maxFrequency);
-        Serial.println();
-    }
-}
+#endif //SB_ARDUINO_PIXELBLAZESENSORBOARD_H
