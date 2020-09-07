@@ -1,3 +1,4 @@
+//NOTE: interrupts may cause issues with fastLED and WS2812 - see the HardwareSerial example
 #include "PixelblazeSensorBoard.h"
 
 #define SENSOR_SERIAL Serial1
